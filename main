@@ -1,0 +1,1137 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 繁體中文幻覺量化評測實驗室</title>
+    
+    <!-- 引入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- 引入 FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"PMingLiU"', '"MingLiU"', '"新細明體"', 'sans-serif'],
+                        mono: ['Lato', 'monospace'],
+                    },
+                    colors: {
+                        typeA: '#10b981', 
+                        typeB: '#f59e0b', 
+                        typeC: '#e11d48', 
+                        typeD: '#64748b', 
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #f8fafc; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        @media (max-width: 1024px) { .mobile-hide { display: none; } }
+        .chart-wrapper { position: relative; height: 100%; width: 100%; }
+        
+        /* 美化滑桿 (Range Slider) */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 2px;
+        }
+        input[type=range]:focus { outline: none; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- 左側邊欄 -->
+    <aside id="sidebar" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col h-full absolute md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+        <div class="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-shield-halved text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold tracking-tight leading-tight">2026 幻覺管理評測系統</h1>
+                    <span class="text-[10px] text-slate-400 font-mono tracking-widest">WEB DASHBOARD</span>
+                </div>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-slate-700">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-5 pb-10">
+            <!-- API 模式 -->
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-2">API 引擎與模型選擇</p>
+                
+                <!-- OpenAI Group -->
+                <div class="mb-3 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-200 mb-2 cursor-pointer group" onclick="toggleMaster('openai')">
+                        <span class="text-xs font-black text-slate-700 group-hover:text-indigo-600 transition-colors"><i class="fa-solid fa-robot mr-1"></i> OpenAI 全選/全關</span>
+                        <div id="master-openai" class="w-8 h-4 bg-indigo-600 rounded-full relative transition-colors duration-200">
+                            <div class="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-4 transition-transform duration-200"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5 pl-1">
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gpt-4o')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">GPT-4o (基準線)</span>
+                            <div id="model-gpt-4o" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gpt-4o-mini')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">GPT-4o mini (輕量版)</span>
+                            <div id="model-gpt-4o-mini" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gpt-5-nano')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">GPT-5 Nano (邊緣運算)</span>
+                            <div id="model-gpt-5-nano" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gpt-5.2')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">GPT-5.2 (旗艦版)</span>
+                            <div id="model-gpt-5.2" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gpt-o3-baseline')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">GPT-o3 (強推理-基準)</span>
+                            <div id="model-gpt-o3-baseline" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gpt-o3-cot')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">GPT-o3 (強推理-思維鍊)</span>
+                            <div id="model-gpt-o3-cot" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gemini Group -->
+                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-200 mb-2 cursor-pointer group" onclick="toggleMaster('gemini')">
+                        <span class="text-xs font-black text-slate-700 group-hover:text-indigo-600 transition-colors"><i class="fa-solid fa-sparkles mr-1"></i> Gemini 全選/全關</span>
+                        <div id="master-gemini" class="w-8 h-4 bg-indigo-600 rounded-full relative transition-colors duration-200">
+                            <div class="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-4 transition-transform duration-200"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5 pl-1">
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gemini-3.0-flash')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">Gemini 3.0 Flash (輕量)</span>
+                            <div id="model-gemini-3.0-flash" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gemini-3.0-pro')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">Gemini 3.0 Pro (通用)</span>
+                            <div id="model-gemini-3.0-pro" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gemini-3.0-flagship')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">Gemini 3.0 Flagship (旗艦)</span>
+                            <div id="model-gemini-3.0-flagship" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gemini-3.0-intuition')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">Gemini 3.0 Intuition (快思)</span>
+                            <div id="model-gemini-3.0-intuition" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gemini-3.0-safe')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">Gemini 3.0 Safe (高安全)</span>
+                            <div id="model-gemini-3.0-safe" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer" onclick="toggleModel('gemini-3.0-thinking')">
+                            <span class="text-[11px] font-bold text-slate-500 hover:text-indigo-500">Gemini 3.0 Thinking (CoT)</span>
+                            <div id="model-gemini-3.0-thinking" class="w-6 h-3 bg-indigo-600 rounded-full relative transition-colors duration-200"><div class="w-2 h-2 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-3 transition-transform duration-200"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ★ 新增：生成超參數調節 (Sliders) ★ -->
+            <div class="border-t border-slate-100 pt-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-2 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-slate-300"></i> 生成超參數調節
+                </p>
+                
+                <div class="space-y-5 px-2">
+                    <!-- 溫度設定 -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-bold text-slate-700">溫度設定 (Temp)</label>
+                            <span id="val-temp" class="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">0.7</span>
+                        </div>
+                        <input type="range" id="slider-temp" min="0" max="2" step="0.1" value="0.7" oninput="updateHyperparam('temp', this.value)">
+                        <div class="flex justify-between text-[8px] text-slate-400 mt-1 font-bold">
+                            <span>保守安全</span>
+                            <span>高風險/高創意</span>
+                        </div>
+                    </div>
+
+                    <!-- 檢索深度 -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-bold text-slate-700">檢索深度 (K-Value)</label>
+                            <span id="val-kValue" class="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">3 篇</span>
+                        </div>
+                        <input type="range" id="slider-k" min="0" max="10" step="1" value="3" oninput="updateHyperparam('kValue', this.value)">
+                        <div class="flex justify-between text-[8px] text-slate-400 mt-1 font-bold">
+                            <span>無外部知識</span>
+                            <span>高事實密度</span>
+                        </div>
+                    </div>
+
+                    <!-- CoT 思考深度 -->
+                    <div id="cot-slider-container" class="transition-all duration-300">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-bold text-slate-700">思考深度 (CoT)</label>
+                            <span id="val-cot" class="text-[10px] font-mono font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded transition-colors">1 階</span>
+                        </div>
+                        <input type="range" id="slider-cot" min="1" max="5" step="1" value="1" oninput="updateHyperparam('cot', this.value)">
+                        <div class="flex justify-between text-[8px] text-slate-400 mt-1 font-bold">
+                            <span>直覺快思</span>
+                            <span>深度慢想 (高延遲)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 機制消融 -->
+            <div class="border-t border-slate-100 pt-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                    <i class="fa-solid fa-filter text-slate-300"></i> 風險攔截機制
+                </p>
+                <div class="space-y-1">
+                    <div class="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl cursor-pointer" onclick="toggleMechanism('m1')">
+                        <p class="text-xs font-bold text-slate-700">M1 過度自信攔截</p>
+                        <div id="m1" class="w-8 h-4 bg-indigo-600 rounded-full relative transition-colors"><div class="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-4 transition-transform duration-200"></div></div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl cursor-pointer" onclick="toggleMechanism('m2')">
+                        <p class="text-xs font-bold text-slate-700">M2 錯誤分層評估</p>
+                        <div id="m2" class="w-8 h-4 bg-indigo-600 rounded-full relative transition-colors"><div class="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-4 transition-transform duration-200"></div></div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl cursor-pointer" onclick="toggleMechanism('m3')">
+                        <p class="text-xs font-bold text-slate-700">M3 流暢性陷阱偵測</p>
+                        <div id="m3" class="w-8 h-4 bg-indigo-600 rounded-full relative transition-colors"><div class="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-4 transition-transform duration-200"></div></div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl cursor-pointer" onclick="toggleMechanism('m4')">
+                        <p class="text-xs font-bold text-slate-700">M4 快速生成預警</p>
+                        <div id="m4" class="w-8 h-4 bg-indigo-600 rounded-full relative transition-colors"><div class="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-4 transition-transform duration-200"></div></div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl cursor-pointer" onclick="toggleMechanism('m5')">
+                        <p class="text-xs font-bold text-slate-700">M5 推理深度調節 (CoT)</p>
+                        <div id="m5" class="w-8 h-4 bg-indigo-600 rounded-full relative transition-colors"><div class="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 translate-x-4 transition-transform duration-200"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主畫面區 -->
+    <main class="flex-1 flex flex-col h-full bg-[#f4f7f9] relative w-full">
+        <header class="h-20 glass-panel border-b border-slate-200 flex items-center justify-between px-4 md:px-6 shrink-0 z-30">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" class="md:hidden text-slate-600 text-xl">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div>
+                    <h2 class="text-xl font-black text-slate-800 tracking-tight">網站實驗室平台</h2>
+                    <p class="text-xs text-slate-500 font-bold mt-0.5">全自動與視覺化分析看板</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-100 mr-2">
+                    <i class="fa-solid fa-user-check"></i> 教師權限
+                </div>
+                
+                <!-- 新增控制按鈕區域 -->
+                <button id="pauseBtn" onclick="pauseSimulation()" class="hidden items-center gap-2 px-3 md:px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-sm font-bold shadow-sm hover:bg-amber-100 transition-all active:scale-95">
+                    <i class="fa-solid fa-pause"></i> <span class="hidden sm:inline">暫停</span>
+                </button>
+                
+                <button id="resumeBtn" onclick="resumeSimulation()" class="hidden items-center gap-2 px-3 md:px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-100 transition-all active:scale-95">
+                    <i class="fa-solid fa-play"></i> <span class="hidden sm:inline">繼續</span>
+                </button>
+
+                <button id="clearBtn" onclick="clearSimulation()" class="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold shadow-sm hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all active:scale-95">
+                    <i class="fa-solid fa-trash-can"></i> <span class="hidden sm:inline">清除</span>
+                </button>
+                
+                <button id="startBtn" onclick="runSimulation()" class="flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg shadow-slate-300 hover:bg-indigo-600 hover:shadow-indigo-200 transition-all active:scale-95">
+                    <i class="fa-solid fa-rotate-right text-emerald-400"></i> <span class="hidden sm:inline">重新產生比較數據</span><span class="sm:hidden">重新產生</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
+            <div class="max-w-[1500px] mx-auto space-y-6">
+                
+                <!-- KPI 指標區 -->
+                <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-16 h-16 bg-rose-50 rounded-bl-full -z-10 group-hover:bg-rose-100 transition-colors"></div>
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">風險分數 (HRS)</span>
+                            <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+                        </div>
+                        <span id="kpi-hrs" class="text-3xl font-mono font-black text-slate-800 mt-2">0.000</span>
+                    </div>
+                    
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-16 h-16 bg-indigo-50 rounded-bl-full -z-10 group-hover:bg-indigo-100 transition-colors"></div>
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">事實密度 (FAD)</span>
+                            <i class="fa-solid fa-database text-indigo-500"></i>
+                        </div>
+                        <span id="kpi-fad" class="text-3xl font-mono font-black text-slate-800 mt-2">0.00</span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-bl-full -z-10 group-hover:bg-amber-100 transition-colors"></div>
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">平均延遲 (ms)</span>
+                            <i class="fa-solid fa-stopwatch text-amber-500"></i>
+                        </div>
+                        <span id="kpi-latency" class="text-3xl font-mono font-black text-slate-800 mt-2">0</span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-bl-full -z-10 group-hover:bg-emerald-100 transition-colors"></div>
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">人工介入率</span>
+                            <i class="fa-solid fa-users text-emerald-500"></i>
+                        </div>
+                        <span id="kpi-intervention" class="text-3xl font-mono font-black text-slate-800 mt-2">0.0%</span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-full -z-10 group-hover:bg-blue-100 transition-colors"></div>
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">評測信度 (Kappa)</span>
+                            <i class="fa-solid fa-check-double text-blue-500"></i>
+                        </div>
+                        <div class="flex items-end justify-between">
+                            <span id="kpi-kappa" class="text-3xl font-mono font-black text-slate-800 mt-2">0.00</span>
+                            <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider mb-1">高度一致</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 核心圖表區 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    <!-- 圖表 1：互動式圓餅圖 -->
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col relative h-[320px]">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-pie text-indigo-500"></i> 錯誤型態比例分析 (共300次判定)
+                            </h3>
+                            <span id="hyper-status" class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest">即時動態</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mb-4">將游標懸停在色塊上可檢視各類別精確題數</p>
+                        
+                        <div class="flex-1 flex items-center justify-center gap-8 relative w-full">
+                            <div class="relative w-[180px] h-[180px] sm:w-[220px] sm:h-[220px]">
+                                <div class="chart-wrapper">
+                                    <canvas id="typePieChart"></canvas>
+                                </div>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span id="pie-total" class="text-4xl font-black text-slate-800 leading-none">0</span>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-widest">總判定數</span>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4 min-w-[120px]">
+                                <div class="flex items-center justify-between text-sm">
+                                    <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded bg-typeC"></div><span class="font-bold text-slate-700">Type C (幻覺)</span></div>
+                                    <span id="leg-c" class="font-mono font-black text-rose-600 ml-4">0%</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded bg-typeB"></div><span class="font-bold text-slate-700">Type B (錯置)</span></div>
+                                    <span id="leg-b" class="font-mono font-black text-amber-600 ml-4">0%</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded bg-typeD"></div><span class="font-bold text-slate-700">Type D (拒答)</span></div>
+                                    <span id="leg-d" class="font-mono font-black text-slate-500 ml-4">0%</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded bg-typeA"></div><span class="font-bold text-slate-700">Type A (正確)</span></div>
+                                    <span id="leg-a" class="font-mono font-black text-emerald-600 ml-4">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 圖表 2：互動式散佈圖 -->
+                    <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-col relative h-[320px]">
+                        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2 mb-1">
+                            <i class="fa-solid fa-bolt text-yellow-400"></i> 效率-風險權衡圖 (Efficiency vs Risk)
+                        </h3>
+                        <p class="text-[10px] text-slate-400 mb-4">X軸: 生成延遲 (ms) | Y軸: 核心幻覺風險 (HRS)</p>
+                        
+                        <div class="flex-1 relative w-full bg-slate-800/50 rounded-xl p-2">
+                            <div class="chart-wrapper">
+                                <canvas id="scatterChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 底部清單區 -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+                        <h3 class="text-sm font-bold flex items-center gap-2 text-slate-800">
+                            <i class="fa-solid fa-list-check text-indigo-500"></i> 實時評測流水線清單 (共100題)
+                        </h3>
+                        <span id="progress-text" class="text-[10px] bg-slate-200 text-slate-600 px-3 py-1 rounded-full font-bold uppercase tracking-wider transition-colors duration-300">
+                            <i class="fa-solid fa-circle-check mr-1"></i> 系統就緒
+                        </span>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto no-scrollbar relative" id="table-container">
+                        <table class="w-full text-left border-collapse">
+                           <thead class="sticky top-0 bg-white shadow-sm z-0">
+    <tr class="text-[11px] text-slate-400 uppercase font-black tracking-wider bg-white">
+        <th class="px-6 py-4 w-1/4">模型與標題</th>
+        <th class="px-2 py-4 text-center w-16">判定1</th>
+        <th class="px-2 py-4 text-center w-16">判定2</th>
+        <th class="px-2 py-4 text-center w-16">判定3</th>
+        <th class="px-4 py-4 w-1/3">AI 回答預覽</th>
+        <th class="px-4 py-4 text-right mobile-hide w-20">延遲 (ms)</th>
+        <th class="px-4 py-4 text-right w-24">平均風險</th>
+    </tr>
+</thead>
+                            <tbody id="table-body" class="divide-y divide-slate-100 text-sm">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- 彈出視窗 (Modal) -->
+    <div id="detail-modal" class="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
+        <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl relative transform scale-95 transition-transform duration-200" id="modal-content">
+            <button onclick="closeModal()" class="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-full transition-colors focus:outline-none">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="p-8 sm:p-10">
+                <div class="flex items-center gap-3 mb-6">
+                    <div id="modal-badge-container" class="flex flex-wrap gap-2"></div>
+                    <span id="modal-model" class="text-xs font-bold text-slate-500 font-mono tracking-widest ml-auto"></span>
+                </div>
+                <h4 id="modal-title" class="text-2xl font-bold text-slate-800 mb-2 leading-tight"></h4>
+                <p class="text-[11px] text-slate-400 font-mono mb-8" id="modal-time"></p>
+                <div class="grid grid-cols-3 gap-4 py-6 border-y border-slate-100">
+                    <div class="text-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Latency</p>
+                        <p id="modal-lat" class="text-xl font-mono font-black text-slate-800"></p>
+                    </div>
+                    <div class="text-center border-x border-slate-100">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Fact Density</p>
+                        <p id="modal-fad" class="text-xl font-mono font-black text-slate-800"></p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Risk (Avg HRS)</p>
+                        <p id="modal-hrs" class="text-xl font-mono font-black text-rose-600"></p>
+                    </div>
+                </div>
+<div class="mt-6 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100">
+    <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <i class="fa-solid fa-comment-dots"></i> AI 原始回答內容
+    </p>
+    <div class="text-sm text-slate-700 leading-relaxed text-justify max-h-40 overflow-y-auto pr-2 no-scrollbar" id="modal-ai-response">
+        </div>
+</div>
+<div class="mt-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <div class="mt-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-microchip"></i> 綜合裁判分析 (AI Judge)
+                    </p>
+                    <p class="text-sm text-slate-700 leading-relaxed text-justify" id="modal-desc"></p>
+                </div>
+                <div class="mt-8 flex gap-3">
+                    <button class="flex-1 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors">專家修正標記</button>
+                    <button onclick="closeModal()" class="flex-1 py-3 bg-white border border-slate-300 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">關閉視窗 (ESC)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* --- Chart.js 實體與配置 --- */
+        let pieChartInstance = null;
+        let scatterChartInstance = null;
+        const CHART_COLORS = { A: '#10b981', B: '#f59e0b', C: '#e11d48', D: '#64748b' };
+
+        function initCharts() {
+            Chart.defaults.font.family = '"PMingLiU", "新細明體", sans-serif';
+            
+            const ctxPie = document.getElementById('typePieChart').getContext('2d');
+            pieChartInstance = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Type C (幻覺)', 'Type B (錯置)', 'Type D (拒答)', 'Type A (正確)'],
+                    datasets: [{
+                        data: [0, 0, 0, 1],
+                        backgroundColor: [CHART_COLORS.C, CHART_COLORS.B, CHART_COLORS.D, CHART_COLORS.A],
+                        borderWidth: 0, hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '75%', animation: { duration: 400 },
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label || ''}: ${ctx.parsed} 次` } } }
+                }
+            });
+
+            const ctxScatter = document.getElementById('scatterChart').getContext('2d');
+            scatterChartInstance = new Chart(ctxScatter, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        { label: 'Type C (有幻覺)', data: [], backgroundColor: CHART_COLORS.C, pointRadius: 5, pointHoverRadius: 8 },
+                        { label: 'Type B (有錯置)', data: [], backgroundColor: CHART_COLORS.B, pointRadius: 4, pointHoverRadius: 7 },
+                        { label: 'Type A (皆正確)', data: [], backgroundColor: CHART_COLORS.A, pointRadius: 3, pointHoverRadius: 6 },
+                        { label: 'Type D (有拒答)', data: [], backgroundColor: CHART_COLORS.D, pointRadius: 4, pointHoverRadius: 7 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+                    plugins: {
+                        legend: { display: true, labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 } } },
+                        tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', titleFont: { size: 13 }, bodyFont: { size: 12 }, padding: 10,
+                            callbacks: { label: (ctx) => [`📌 ${ctx.raw.title}`, `模型: ${ctx.raw.model}`, `延遲: ${ctx.raw.x} ms`, `平均風險: ${ctx.raw.y} HRS`] }
+                        }
+                    },
+                    scales: {
+                        x: { type: 'linear', position: 'bottom', grid: { color: 'rgba(51, 65, 85, 0.5)', drawBorder: false }, ticks: { color: '#94a3b8', font: { family: 'Lato' } } },
+                        y: { beginAtZero: true, max: 1.0, grid: { color: 'rgba(51, 65, 85, 0.5)', drawBorder: false }, ticks: { color: '#94a3b8', font: { family: 'Lato' } } }
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+        });
+
+        /* --- 狀態控制與超參數 (Hyperparameters) --- */
+        let isRunning = false;
+        let isPaused = false;
+        let simTimeout = null;
+        
+        const mechanisms = { m1: true, m2: true, m3: true, m4: true, m5: true };
+        
+        const MODEL_MAP = {
+            'gpt-4o': 'GPT-4o (基準線)',
+            'gpt-4o-mini': 'GPT-4o mini (輕量版)',
+            'gpt-5-nano': 'GPT-5 Nano (超輕量/邊緣運算)',
+            'gpt-5.2': 'GPT-5.2 (旗艦版)',
+            'gpt-o3-baseline': 'GPT-o3 (Baseline) (強推理-基準)',
+            'gpt-o3-cot': 'GPT-o3 (CoT) (強推理-思維鍊)',
+            'gemini-3.0-flash': 'Gemini 3.0 Flash (輕量版)',
+            'gemini-3.0-pro': 'Gemini 3.0 Pro (General) (通用版)',
+            'gemini-3.0-flagship': 'Gemini 3.0 Flagship (旗艦版)',
+            'gemini-3.0-intuition': 'Gemini 3.0 Intuition (直覺快思)',
+            'gemini-3.0-safe': 'Gemini 3.0 Safe (高安全版)',
+            'gemini-3.0-thinking': 'Gemini 3.0 Thinking (CoT) (思維鍊版)'
+        };
+        
+        let modelStates = Object.keys(MODEL_MAP).reduce((acc, key) => { acc[key] = true; return acc; }, {});
+        
+        const hyperParams = { temp: 0.7, kValue: 3, cot: 1 };
+        
+        // 全域模擬狀態物件，方便暫停/繼續時調用
+        let simState = {
+            results: [],
+            typeCounts: { A: 0, B: 0, C: 0, D: 0 },
+            currentIndex: 0,
+            totalItems: 100,
+            selectedModels: [],
+            baseReduction: 0,
+            tempFactorC: 0, tempFactorD: 0, kFactorB: 0, kLatPenalty: 0, kFadBoost: 0,
+            cotFactorC: 1, cotLatMultiplier: 1
+        };
+
+        function updateHyperparam(key, value) {
+            hyperParams[key] = parseFloat(value);
+            let displayVal = value;
+            if (key === 'kValue') displayVal += ' 篇';
+            if (key === 'cot') displayVal += ' 階';
+            
+            document.getElementById(`val-${key}`).innerText = displayVal;
+            
+            document.getElementById('hyper-status').classList.replace('text-slate-400', 'text-indigo-600');
+            document.getElementById('hyper-status').classList.replace('bg-slate-100', 'bg-indigo-100');
+            setTimeout(() => {
+                document.getElementById('hyper-status').classList.replace('text-indigo-600', 'text-slate-400');
+                document.getElementById('hyper-status').classList.replace('bg-indigo-100', 'bg-slate-100');
+            }, 500);
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if(sidebar.classList.contains('-translate-x-full')) sidebar.classList.remove('-translate-x-full');
+            else sidebar.classList.add('-translate-x-full');
+        }
+
+        function toggleMechanism(id) {
+            mechanisms[id] = !mechanisms[id];
+            updateToggleUI(id, mechanisms[id]);
+            
+            if (id === 'm5') {
+                const cotContainer = document.getElementById('cot-slider-container');
+                const cotSlider = document.getElementById('slider-cot');
+                const cotVal = document.getElementById('val-cot');
+                if (mechanisms.m5) {
+                    cotContainer.classList.remove('opacity-40', 'pointer-events-none', 'grayscale');
+                    cotSlider.disabled = false;
+                    cotVal.classList.replace('bg-slate-100', 'bg-amber-50');
+                    cotVal.classList.replace('text-slate-400', 'text-amber-600');
+                    cotVal.innerText = hyperParams.cot + ' 階';
+                } else {
+                    cotContainer.classList.add('opacity-40', 'pointer-events-none', 'grayscale');
+                    cotSlider.disabled = true;
+                    cotVal.classList.replace('bg-amber-50', 'bg-slate-100');
+                    cotVal.classList.replace('text-amber-600', 'text-slate-400');
+                    cotVal.innerText = 'M5已關閉';
+                }
+            }
+        }
+
+        function toggleModel(id) {
+            modelStates[id] = !modelStates[id];
+            updateSmallToggleUI(`model-${id}`, modelStates[id], false);
+            checkMasterState();
+        }
+
+        function toggleMaster(family) {
+            const keys = Object.keys(MODEL_MAP).filter(k => k.startsWith(family === 'openai' ? 'gpt' : 'gemini'));
+            const allOn = keys.every(k => modelStates[k]);
+            const targetState = !allOn;
+            
+            keys.forEach(k => {
+                modelStates[k] = targetState;
+                updateSmallToggleUI(`model-${k}`, targetState, false);
+            });
+            updateSmallToggleUI(`master-${family}`, targetState, true);
+        }
+
+        function checkMasterState() {
+            ['openai', 'gemini'].forEach(family => {
+                const keys = Object.keys(MODEL_MAP).filter(k => k.startsWith(family === 'openai' ? 'gpt' : 'gemini'));
+                const allOn = keys.every(k => modelStates[k]);
+                updateSmallToggleUI(`master-${family}`, allOn, true);
+            });
+        }
+
+        function updateSmallToggleUI(id, isEnabled, isMaster) {
+            const el = document.getElementById(id);
+            if(!el) return;
+            const knob = el.firstElementChild;
+            const translateOn = isMaster ? 'translate-x-4' : 'translate-x-3';
+            
+            if (isEnabled) {
+                el.classList.replace('bg-slate-300', 'bg-indigo-600');
+                knob.classList.add(translateOn);
+            } else {
+                el.classList.replace('bg-indigo-600', 'bg-slate-300');
+                knob.classList.remove(translateOn);
+            }
+        }
+
+        function updateToggleUI(id, isEnabled) {
+            const el = document.getElementById(id);
+            if(!el) return;
+            const knob = el.firstElementChild;
+            if (isEnabled) {
+                el.classList.replace('bg-slate-300', 'bg-indigo-600');
+                knob.classList.add('translate-x-4');
+            } else {
+                el.classList.replace('bg-indigo-600', 'bg-slate-300');
+                knob.classList.remove('translate-x-4');
+            }
+        }
+
+        /* --- 彈出視窗 --- */
+        const modal = document.getElementById('detail-modal');
+        const modalContent = document.getElementById('modal-content');
+        function openModal(dataStr) {
+            const data = JSON.parse(decodeURIComponent(dataStr));
+            document.getElementById('modal-ai-response').innerText = data.aiResponse || '無法取得 AI 回答。';
+            document.getElementById('modal-title').innerText = data.title;
+            document.getElementById('modal-model').innerText = data.model;
+            document.getElementById('modal-time').innerText = data.timestamp;
+            document.getElementById('modal-lat').innerText = data.latency + ' ms';
+            document.getElementById('modal-fad').innerText = data.fad;
+            document.getElementById('modal-hrs').innerText = data.hrs;
+            
+            const badgeContainer = document.getElementById('modal-badge-container');
+            badgeContainer.innerHTML = data.type.map((t, i) => {
+                let badgeClass = t === 'Type_A' ? 'bg-emerald-100 text-emerald-700' : t === 'Type_B' ? 'bg-amber-100 text-amber-700' : t === 'Type_C' ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-700';
+                return `<span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${badgeClass}">判定${i+1}: ${t.replace('_', ' ')}</span>`;
+            }).join('');
+            
+            const pType = data.type.includes('Type_C') ? 'Type_C' : (data.type.includes('Type_B') ? 'Type_B' : (data.type.includes('Type_D') ? 'Type_D' : 'Type_A'));
+            let desc = "";
+            if(pType === 'Type_A') { desc = "「經過三次判定，事實密度皆高且未偵測到過度斷言語氣，綜合判定為完全正確。」"; }
+            else if(pType === 'Type_B') { desc = "「在某次判定中流暢度極高，但發現事實偏移，屬於隱蔽性極強的知識錯置。」"; }
+            else if(pType === 'Type_C') { desc = "「部分判定出現生成延遲異常且邏輯矛盾，綜合評估為高後果核心幻覺。」"; }
+            else { desc = "「部分判定觸發安全機制，模型採取保守策略拒絕回答。」"; }
+            document.getElementById('modal-desc').innerText = desc;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95'); }, 10);
+        }
+        function closeModal() {
+            modal.classList.add('opacity-0'); modalContent.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+        document.addEventListener('keydown', (e) => { if (e.key === "Escape" && !modal.classList.contains('hidden')) closeModal(); });
+
+        /* --- 動態高階數學數據引擎 (結合超參數) --- */
+        const MODEL_PROFILES = {
+            'GPT-4o (基準線)': { tC: 0.05, tB: 0.08, tD: 0.05, lat: 5500, fad: 0.88 },
+            'GPT-4o mini (輕量版)': { tC: 0.15, tB: 0.12, tD: 0.07, lat: 2500, fad: 0.76 },
+            'GPT-5 Nano (超輕量/邊緣運算)': { tC: 0.20, tB: 0.18, tD: 0.08, lat: 1200, fad: 0.68 },
+            'GPT-5.2 (旗艦版)': { tC: 0.01, tB: 0.03, tD: 0.04, lat: 12500, fad: 0.96 },
+            'GPT-o3 (Baseline) (強推理-基準)': { tC: 0.03, tB: 0.05, tD: 0.06, lat: 8500, fad: 0.90 },
+            'GPT-o3 (CoT) (強推理-思維鍊)': { tC: 0.005, tB: 0.01, tD: 0.08, lat: 22000, fad: 0.98 },
+            'Gemini 3.0 Flash (輕量版)': { tC: 0.12, tB: 0.10, tD: 0.05, lat: 2200, fad: 0.82 },
+            'Gemini 3.0 Pro (General) (通用版)': { tC: 0.04, tB: 0.06, tD: 0.04, lat: 4500, fad: 0.90 },
+            'Gemini 3.0 Flagship (旗艦版)': { tC: 0.01, tB: 0.02, tD: 0.03, lat: 11000, fad: 0.97 },
+            'Gemini 3.0 Intuition (直覺快思)': { tC: 0.08, tB: 0.15, tD: 0.02, lat: 1500, fad: 0.78 },
+            'Gemini 3.0 Safe (高安全版)': { tC: 0.01, tB: 0.02, tD: 0.25, lat: 5000, fad: 0.85 },
+            'Gemini 3.0 Thinking (CoT) (思維鍊版)': { tC: 0.005, tB: 0.01, tD: 0.06, lat: 18000, fad: 0.96 }
+        };
+
+        function updateButtonStates() {
+            const startBtn = document.getElementById('startBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resumeBtn = document.getElementById('resumeBtn');
+            
+            if (isRunning) {
+                startBtn.classList.add('hidden'); startBtn.classList.remove('flex');
+                pauseBtn.classList.remove('hidden'); pauseBtn.classList.add('flex');
+                resumeBtn.classList.add('hidden'); resumeBtn.classList.remove('flex');
+            } else if (isPaused) {
+                startBtn.classList.add('hidden'); startBtn.classList.remove('flex');
+                pauseBtn.classList.add('hidden'); pauseBtn.classList.remove('flex');
+                resumeBtn.classList.remove('hidden'); resumeBtn.classList.add('flex');
+            } else {
+                startBtn.classList.remove('hidden'); startBtn.classList.add('flex');
+                pauseBtn.classList.add('hidden'); pauseBtn.classList.remove('flex');
+                resumeBtn.classList.add('hidden'); resumeBtn.classList.remove('flex');
+            }
+        }
+
+        function runSimulation() {
+            const selectedModels = Object.keys(modelStates)
+                .filter(k => modelStates[k])
+                .map(k => MODEL_MAP[k]);
+
+            if(selectedModels.length === 0) { alert("請至少開啟一種模型進行測試"); return; }
+
+            if (simTimeout) clearTimeout(simTimeout);
+            
+            isRunning = true;
+            isPaused = false;
+            updateButtonStates();
+
+            const progressText = document.getElementById('progress-text');
+            progressText.className = 'text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider transition-colors duration-300 bg-amber-100 text-amber-700';
+            progressText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> 準備生成...`;
+
+            document.getElementById('table-body').innerHTML = ''; // 清空表格
+            
+            // 重置圖表資料
+            pieChartInstance.data.datasets[0].data = [0, 0, 0, 0];
+            pieChartInstance.update();
+            scatterChartInstance.data.datasets.forEach(d => d.data = []);
+            scatterChartInstance.update();
+
+            // 重置數值
+            document.getElementById('kpi-hrs').innerText = "0.000";
+            document.getElementById('kpi-fad').innerText = "0.00";
+            document.getElementById('kpi-latency').innerText = "0";
+            document.getElementById('kpi-intervention').innerText = "0.0%";
+            document.getElementById('kpi-kappa').innerText = "0.00";
+
+            const activeMechs = Object.values(mechanisms).filter(v=>v).length;
+            
+            // 初始化全局模擬狀態
+            simState = {
+                results: [],
+                typeCounts: { A: 0, B: 0, C: 0, D: 0 },
+                currentIndex: 0,
+                totalItems: 100,
+                selectedModels: selectedModels,
+                baseReduction: activeMechs * 0.12,
+                tempFactorC: Math.pow((hyperParams.temp / 0.7), 1.5),
+                tempFactorD: Math.max(0.1, 1 - (hyperParams.temp - 0.7)),
+                kFactorB: Math.max(0.2, 1 - (hyperParams.kValue * 0.08)),
+                kLatPenalty: hyperParams.kValue * 150,
+                kFadBoost: hyperParams.kValue * 0.015,
+                cotFactorC: mechanisms.m5 ? Math.max(0, 1 - ((hyperParams.cot - 1) * 0.3)) : 1,
+                cotLatMultiplier: mechanisms.m5 ? 1 + ((hyperParams.cot - 1) * 0.6) : 1
+            };
+
+            processNext();
+        }
+
+        function pauseSimulation() {
+            if (!isRunning) return;
+            isRunning = false;
+            isPaused = true;
+            if (simTimeout) clearTimeout(simTimeout);
+            updateButtonStates();
+            
+            const progressText = document.getElementById('progress-text');
+            progressText.className = 'text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider transition-colors duration-300 bg-slate-200 text-slate-700';
+            progressText.innerHTML = `<i class="fa-solid fa-pause mr-1"></i> 已暫停 (${simState.currentIndex}/${simState.totalItems})`;
+        }
+
+        function resumeSimulation() {
+            if (!isPaused) return;
+            isRunning = true;
+            isPaused = false;
+            updateButtonStates();
+            
+            processNext(); // 直接喚醒下一個
+        }
+
+        function clearSimulation() {
+            isRunning = false;
+            isPaused = false;
+            if (simTimeout) clearTimeout(simTimeout);
+            updateButtonStates();
+
+            // 清空畫面元素
+            document.getElementById('table-body').innerHTML = ''; 
+            pieChartInstance.data.datasets[0].data = [0, 0, 0, 0];
+            pieChartInstance.update();
+            scatterChartInstance.data.datasets.forEach(d => d.data = []);
+            scatterChartInstance.update();
+
+            document.getElementById('kpi-hrs').innerText = "0.000";
+            document.getElementById('kpi-fad').innerText = "0.00";
+            document.getElementById('kpi-latency').innerText = "0";
+            document.getElementById('kpi-intervention').innerText = "0.0%";
+            document.getElementById('kpi-kappa').innerText = "0.00";
+            
+            document.getElementById('pie-total').innerText = "0";
+            document.getElementById('leg-c').innerText = "0%";
+            document.getElementById('leg-b').innerText = "0%";
+            document.getElementById('leg-d').innerText = "0%";
+            document.getElementById('leg-a').innerText = "0%";
+
+            const progressText = document.getElementById('progress-text');
+            progressText.className = 'text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider transition-colors duration-300 bg-slate-200 text-slate-600';
+            progressText.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> 系統就緒`;
+            
+            simState.currentIndex = 0; // 重置指標防呆
+        }
+
+        // 定義單步執行函式 (採用真實 setTimeout 延遲)
+        // ★ API 設置區塊：由環境變數注入或建置工具替換
+        // 如果是在純 HTML 測試，可以先暫時寫死字串；若有建置工具 (如 Vite/Webpack) 可用 process.env 替換
+        const OPENAI_API_KEY = window.ENV_OPENAI_API_KEY || '請在此填入您的_OPENAI_API_KEY'; 
+
+        // 封裝呼叫 GPT-4o 的函數，並要求強制回傳 JSON 格式
+        async function callGPT4oEvaluator(testTitle, modelName, hyperParams, activeMechanisms) {
+            // 基礎系統提示詞，定義 JSON 輸出格式
+            let systemPrompt = `你是一個嚴格的繁體中文語言模型幻覺評測實驗室系統。
+請針對給定的測試題，先生成一段「AI 模擬回答」，接著對這個回答進行三次獨立的幻覺風險判定。
+請務必以 JSON 格式回傳，格式如下：
+{
+  "aiResponse": "AI的模擬回答內容...",
+  "evaluations": ["Type_A", "Type_B", "Type_C"], 
+  "fadScore": 0.85,
+  "hrsScore": 0.12
+}
+【判定標準】: Type_A(完全正確), Type_B(知識錯置), Type_C(嚴重幻覺), Type_D(觸發安全機制拒答)。
+評測時，請考慮目標模型是：${modelName}。`;
+
+            // 將五大機制 (M1~M5) 動態轉化為 GPT-4o 的評估指令
+            if (activeMechanisms.m1) {
+                systemPrompt += "\n[機制 M1 啟用]: 嚴格攔截過度自信的語氣。若發現無實質證據的絕對斷言，請提高 HRS 分數並增加判定為 Type_C 的機率。";
+            }
+            if (activeMechanisms.m2) {
+                systemPrompt += "\n[機制 M2 啟用]: 執行嚴格的錯誤分層評估。不要只給對/錯，必須精準區分是事實偏移 (Type_B) 還是憑空捏造 (Type_C)。";
+            }
+            if (activeMechanisms.m3) {
+                systemPrompt += "\n[機制 M3 啟用]: 偵測流暢性陷阱。若語意非常通順但缺乏「原子事實 (Atomic Facts)」，請大幅降低 fadScore (事實密度)。";
+            }
+            if (activeMechanisms.m5) {
+                systemPrompt += `\n[機制 M5 啟用]: 啟動思維鍊 (CoT) 深度調節，當前設定為 ${hyperParams.cot} 階。請在給出最終 JSON 前，進行多步驟的內部邏輯自省，確保判定的嚴謹度。`;
+            }
+
+            const userPrompt = `當前測試題目：「${testTitle}」。檢索深度 K-Value 為 ${hyperParams.kValue} 篇。請根據上述要求生成對應的 JSON 評測報告。`;
+
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${OPENAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    temperature: hyperParams.temp, // 綁定面板的溫度設定
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    response_format: { type: "json_object" } // 要求 GPT-4o 穩定輸出 JSON
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error?.message || 'API 請求失敗');
+            }
+
+            const result = await response.json();
+            return JSON.parse(result.choices[0].message.content);
+        }
+
+        // 全新的 processNext 函數 (Async 版)
+        const processNext = async () => {
+            if (!isRunning) return;
+
+            if (simState.currentIndex >= simState.totalItems) {
+                isRunning = false;
+                isPaused = false;
+                updateButtonStates();
+                
+                const progressText = document.getElementById('progress-text');
+                progressText.className = 'text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider transition-colors duration-300 bg-emerald-100 text-emerald-700';
+                progressText.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> 分析完成 (共 ${simState.totalItems} 題)`;
+                
+                pieChartInstance.update();
+                scatterChartInstance.update();
+                return;
+            }
+
+            const modelName = simState.selectedModels[Math.floor(Math.random() * simState.selectedModels.length)];
+            const testTitle = `華語測試題 #${String(simState.currentIndex + 1).padStart(3, '0')}`;
+            
+            // 更新進度條狀態為 API 呼叫中
+            const progressText = document.getElementById('progress-text');
+            progressText.className = 'text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider transition-colors duration-300 bg-indigo-100 text-indigo-700';
+            progressText.innerHTML = `<i class="fa-solid fa-cloud-arrow-up fa-bounce mr-1"></i> GPT-4o 深度評測中 (${simState.currentIndex + 1}/${simState.totalItems})...`;
+
+            const startTime = Date.now(); // 記錄真實起始時間
+
+            try {
+                // 呼叫真實的 GPT-4o API
+                const evalData = await callGPT4oEvaluator(testTitle, modelName, hyperParams, mechanisms);
+                
+                const endTime = Date.now();
+                let actualLatency = endTime - startTime; // 取得真實 API 延遲 (ms)
+
+                // [機制 M4]: 快速生成預警的後處理
+                let finalHrs = evalData.hrsScore;
+                if (mechanisms.m4 && actualLatency < 1200) {
+                    // 若 M4 啟用且生成速度異常快，系統強制提升風險分數 (認為可能跳過思考)
+                    finalHrs = Math.min(1.0, finalHrs + 0.15);
+                }
+
+                // 確保 evaluations 陣列剛好有三個值
+                let finalTypes = Array.isArray(evalData.evaluations) ? evalData.evaluations.slice(0, 3) : ['Type_A', 'Type_A', 'Type_A'];
+                while(finalTypes.length < 3) finalTypes.push('Type_A');
+
+                const rowData = {
+                    id: simState.currentIndex, 
+                    title: testTitle, 
+                    model: modelName, 
+                    type: finalTypes,
+                    aiResponse: evalData.aiResponse || '模型未提供有效回答',
+                    latency: actualLatency, 
+                    fad: parseFloat(evalData.fadScore || 0).toFixed(2), 
+                    hrs: parseFloat(finalHrs || 0).toFixed(3),
+                    timestamp: new Date().toLocaleTimeString('en-US', { hour12: false })
+                };
+                
+                // 檢查是否中途被使用者按下暫停或清除
+                if (!isRunning) return;
+
+                simState.results.push(rowData);
+
+                // 更新分類計數
+                rowData.type.forEach(t => {
+                    if (simState.typeCounts[t.replace('Type_', '')] !== undefined) {
+                        simState.typeCounts[t.replace('Type_', '')]++;
+                    }
+                });
+
+                // 增量更新 UI
+                updateUIIncremental(rowData, simState.results, simState.typeCounts, simState.currentIndex + 1);
+                simState.currentIndex++;
+                
+                // 繼續下一題 (為了避免短時間打爆 API 限制，稍微延遲 500ms)
+                simTimeout = setTimeout(() => {
+                    processNext();
+                }, 500);
+
+            } catch (error) {
+                console.error("GPT-4o 評測中斷:", error);
+                progressText.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> API 錯誤: ${error.message}，已暫停`;
+                progressText.className = 'text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider transition-colors duration-300 bg-rose-100 text-rose-700';
+                pauseSimulation(); // 發生錯誤時自動暫停系統
+            }
+        };
+
+            const model = simState.selectedModels[Math.floor(Math.random() * simState.selectedModels.length)];
+            const prof = MODEL_PROFILES[model];
+            
+            const effTypeC = Math.max(0, prof.tC * (1 - simState.baseReduction) * simState.tempFactorC * simState.cotFactorC);
+            const effTypeB = Math.max(0, prof.tB * simState.tempFactorC * simState.kFactorB);
+            const effTypeD = Math.max(0, prof.tD * simState.tempFactorD);
+            
+            let types = [];
+            let totalHrs = 0;
+            let maxLatMult = 1.0;
+
+            // 執行三次獨立判定
+            for(let j=0; j<3; j++) {
+                const rand = Math.random();
+                let t = 'Type_A';
+                if(rand < effTypeC) { 
+                    t = 'Type_C'; simState.typeCounts.C++; 
+                    totalHrs += 0.85; maxLatMult = Math.max(maxLatMult, 1.3); 
+                } else if(rand < effTypeC + effTypeB) { 
+                    t = 'Type_B'; simState.typeCounts.B++; 
+                    totalHrs += 0.45; maxLatMult = Math.max(maxLatMult, 1.1); 
+                } else if(rand < effTypeC + effTypeB + effTypeD) { 
+                    t = 'Type_D'; simState.typeCounts.D++; 
+                    totalHrs += 0.05; 
+                } else { 
+                    simState.typeCounts.A++; 
+                    totalHrs += 0.01; 
+                }
+                types.push(t);
+            }
+
+            // 計算這次請求的實際延遲時間
+            const finalLatency = Math.floor((prof.lat * (0.8 + Math.random()*0.4) * maxLatMult * simState.cotLatMultiplier) + simState.kLatPenalty);
+            const finalFad = Math.min(0.99, prof.fad * (0.9 + Math.random()*0.1) + simState.kFadBoost).toFixed(2);
+            const avgHrsBase = (totalHrs / 3).toFixed(3);
+
+            const rowData = {
+                id: simState.currentIndex, title: `華語測試題 #${String(simState.currentIndex+1).padStart(3, '0')}`, model: model, type: types,
+                latency: finalLatency, fad: finalFad, hrs: avgHrsBase,
+                timestamp: new Date().toLocaleTimeString('en-US', { hour12: false })
+            };
+            
+            // 在開始等待時，更新狀態列
+            const progressText = document.getElementById('progress-text');
+            const waitSecs = (finalLatency / 1000).toFixed(1);
+            progressText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> 等待 ${model.split(' ')[0]} 回應... (${waitSecs}s) - 題數 ${simState.currentIndex + 1}/${simState.totalItems}`;
+
+            // 啟動真實等待計時器
+            simTimeout = setTimeout(() => {
+                if (!isRunning) return; // 雙重保險：如果在等待過程中按下暫停或清除，阻斷執行
+
+                simState.results.push(rowData);
+                // 延遲結束後，將資料推入 UI
+                updateUIIncremental(rowData, simState.results, simState.typeCounts, simState.currentIndex + 1);
+                simState.currentIndex++;
+                processNext(); // 觸發下一題
+            }, finalLatency);
+        };
+
+        // 增量更新 UI 函式
+        function updateUIIncremental(newRow, data, counts, currentCount) {
+            const totalEvals = currentCount * 3; 
+            
+            // 計算當前平均值
+            const avgHrs = data.reduce((sum, r) => sum + parseFloat(r.hrs), 0) / currentCount;
+            const avgFad = data.reduce((sum, r) => sum + parseFloat(r.fad), 0) / currentCount;
+            const avgLat = data.reduce((sum, r) => sum + r.latency, 0) / currentCount;
+            const intervention = ((counts.B + counts.C + counts.D) / totalEvals * 100).toFixed(1);
+            
+            const activeMechs = Object.values(mechanisms).filter(v=>v).length;
+            const simulatedKappa = (0.83 + (activeMechs * 0.01) + (Math.random() * 0.02)).toFixed(2);
+
+            // 更新 KPI 看板
+            document.getElementById('kpi-hrs').innerText = avgHrs.toFixed(3);
+            document.getElementById('kpi-fad').innerText = avgFad.toFixed(2);
+            document.getElementById('kpi-latency').innerText = Math.floor(avgLat).toLocaleString();
+            document.getElementById('kpi-intervention').innerText = `${intervention}%`;
+            document.getElementById('kpi-kappa').innerText = simulatedKappa;
+
+            // 即時加入新資料列到表格
+            const tbody = document.getElementById('table-body');
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 transition-colors cursor-pointer group';
+            tr.onclick = () => openModal(encodeURIComponent(JSON.stringify(newRow)));
+            
+            const badgesHTML = newRow.type.map(t => {
+                let badgeClass = t === 'Type_A' ? 'bg-emerald-100 text-emerald-700' : t === 'Type_B' ? 'bg-amber-100 text-amber-700' : t === 'Type_C' ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-700';
+                return `<td class="px-1 py-4"><span class="px-1 py-1 rounded-md text-[9px] font-black uppercase tracking-wider ${badgeClass} block text-center whitespace-nowrap">${t.replace('Type_', '')}</span></td>`;
+            }).join('');
+
+            const responsePreview = newRow.aiResponse && newRow.aiResponse.length > 30 
+                                    ? newRow.aiResponse.substring(0, 30) + '...' 
+                                    : (newRow.aiResponse || '無回應');
+
+            tr.innerHTML = `
+                <td class="px-6 py-4"><p class="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">${newRow.title}</p><p class="text-[10px] text-slate-400 font-mono mt-0.5">${newRow.model}</p></td>
+                ${badgesHTML}
+                <td class="px-4 py-4 text-sm text-slate-600 truncate max-w-xs" title="${newRow.aiResponse}">${responsePreview}</td>
+                <td class="px-4 py-4 text-right font-mono text-slate-500 text-xs mobile-hide">${newRow.latency}</td>
+                <td class="px-4 py-4 text-right font-mono font-bold text-sm ${newRow.hrs > 0.5 ? 'text-rose-600' : 'text-slate-700'}">${newRow.hrs}</td>
+            `;
+            
+            // 自動向下捲動表格，保持最新項目在可視範圍
+            tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // 更新圓餅圖數據
+            document.getElementById('pie-total').innerText = totalEvals;
+            document.getElementById('leg-c').innerText = ((counts.C / totalEvals) * 100).toFixed(1) + '%';
+            document.getElementById('leg-b').innerText = ((counts.B / totalEvals) * 100).toFixed(1) + '%';
+            document.getElementById('leg-d').innerText = ((counts.D / totalEvals) * 100).toFixed(1) + '%';
+            document.getElementById('leg-a').innerText = ((counts.A / totalEvals) * 100).toFixed(1) + '%';
+            
+            pieChartInstance.data.datasets[0].data = [counts.C, counts.B, counts.D, counts.A];
+            pieChartInstance.update('none'); // 使用 none 取消過渡動畫，避免頻繁渲染卡頓
+
+            // 更新散佈圖數據
+            const pt = { x: newRow.latency, y: parseFloat(newRow.hrs), title: newRow.title, model: newRow.model };
+            const pType = newRow.type.includes('Type_C') ? 'Type_C' : (newRow.type.includes('Type_B') ? 'Type_B' : (newRow.type.includes('Type_D') ? 'Type_D' : 'Type_A'));
+            
+            if(pType==='Type_C') scatterChartInstance.data.datasets[0].data.push(pt); 
+            else if(pType==='Type_B') scatterChartInstance.data.datasets[1].data.push(pt); 
+            else if(pType==='Type_A') scatterChartInstance.data.datasets[2].data.push(pt); 
+            else scatterChartInstance.data.datasets[3].data.push(pt);
+            
+            scatterChartInstance.update('none');
+        }
+    </script>
+</body>
+</html>
